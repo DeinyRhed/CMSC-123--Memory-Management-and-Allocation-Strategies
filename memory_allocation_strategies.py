@@ -24,9 +24,7 @@ class JobInfo:
         if self.__jobTime <= 0:
             self.__jobTime = 0
 
-
-
-            
+     
 
 class MemoryBlock:
     def __init__(self, memoryBlock, memorySize):
@@ -48,17 +46,14 @@ class FirstFit:
         self.__job = job
         self.__allocation = {}  # ({memory : job})
         self.__jobCount = 0     # For the total assigned jobs
-        self.__totalTime = 0
+        self.__totalTime = 140  # total time from the given jobs based on the MP3
         self.__timer = 1        # For the time
         self.__sumIF = {}       # Total Internal Fragmentation per block ({ memory : job })
         self.__sumBlock = 0  
         self.__totalHUP = {}    # Total Heavily Used Partition ({ memoryBlock : jobSize })
         self.__totalUP = {}     # Total Unused Partition ({ memoryBlock : differenceSize})
+        self.__totalWT = 0
        
-    def totalTime(self):
-        for job in self.__job:
-            self.__totalTime += job.jobTime()
-        return self.__totalTime
     
     # This is for the internal fragmentation portion
     def sumIF(self, memory:MemoryBlock, job:JobInfo):
@@ -99,8 +94,12 @@ class FirstFit:
                         self.__allocation.update({memory : job})
                         self.sumIF(memory,job)
                         self.__jobCount += 1
-                        print(f'Job {str(job.jobStream())}: {str(job.jobSize())} has been allocated in memory block {str(memory.memoryBlock())}:{str(memory.memorySize())} and will reside for {str(job.jobTime())} ms') 
                         break
+        
+        for key,value in self.__allocation.items():
+            self.__totalWT += value.jobTime()
+            print(f'Job {str(value.jobStream())} has been allocated in memory block {str(key.memoryBlock())} and will reside for {str(value.jobTime())} ms')
+            
                     
         
         while len(tempList) -1 >= 2:
@@ -113,7 +112,6 @@ class FirstFit:
                     job.updateTime()
                     if job.jobTime() > 0:
                         self.__jobCount += 1
-                        print(f'Job {str(job.jobStream())} : {str(job.jobSize())} has been allocated in memory block {str(memory.memoryBlock())}:{str(memory.memorySize())} and will reside for {str(job.jobTime())} ms')
                     # If time == 1, then remove it from the jobList named tempList
                     # Also remove the value from the self.__allocation dictionary
                     else:
@@ -128,10 +126,15 @@ class FirstFit:
                                     self.__allocation.update({memory : job2})
                                     self.sumIF(memory,job2)
                                     self.__jobCount += 1
-                                    print(f'Job {str(job2.jobStream())} : {str(job.jobSize())} has been allocated in memory block {str(memory.memoryBlock())}:{str(memory.memorySize())} and will reside for {str(job2.jobTime())} ms')
                                     break
                 else:
                     continue
+            for key,value in self.__allocation.items():
+                if value != None:
+                    self.__totalWT += value.jobTime()
+                    print(f'Job {str(value.jobStream())} has been allocated in memory block {str(key.memoryBlock())} and will reside for {str(value.jobTime())} ms')
+                    
+                    
         self.status()
             
     
@@ -139,7 +142,7 @@ class FirstFit:
         print(f'\n===================================== FIRST FIT ===================================== ')
         print(f'AVERAGE THROUGHPUT (TOTAL ASSIGNED JOB COUNT/ TOTAL TIME: {str(round(self.__jobCount/self.__timer, 2))} jobs per unit of time')
         print(f'AVERAGE WAITING QUEUE (TOTAL WQ LENGTH/ TOTAL TIME: {str(round(self.__totalTime/self.__timer,2))} jobs per unit of time')
-        print(f'AVERAGE WAITING TIME (TOTAL WT/ #JOBS: {str(round(self.totalTime()/len(self.__job),2))} jobs per unit of time\n')
+        print(f'AVERAGE WAITING TIME (TOTAL WT/ #JOBS): {str(round(self.__totalWT/self.__jobCount,2))} jobs per unit of time\n')
         print(f'TOTAL UNUSED PARTITION ((TOTAL USED MEMORY / 50000) * 100): {str(round(((sum(self.__totalUP.values()))/50000)*100, 2))}% out of 50,000 memory capacity')
         print(f'TOTAL HEAVILY USED PARTITION ((TOTAL EXHAUSTED MEMORY / 50000) * 100): {str(round(((sum(self.__totalHUP.values()))/50000)*100, 2))}% out of 50,000 memory capacity\n')
         print(f'----------------------------- INTERNAL FRAGMENTATION -----------------------------')
@@ -159,20 +162,13 @@ class BestFit:
         self.__job = job
         self.__allocation = {}  # ({job : memory})
         self.__jobCount = 0     # For the total assigned jobs
-        self.__totalTime = 0
+        self.__totalTime = 140  # constant based on the MP3 given jobs
         self.__timer = 1        # For the timer
         self.__sumBlock = 0
         self.__sumIF = {}       # Total Internal Fragmentation per block ({ memory : diffSize })
-        self.__sumBlock = 0  
         self.__totalHUP = {}    # Total Heavily Used Partition ({ memoryBlock : jobSize })
         self.__totalUP = {}     # Total Unused Partition ({ memoryBlock : differenceSize})
         self.__totalWT = 0
-        self.__totalWQ = {}
-       
-    def totalTime(self):
-        for job in self.__job:
-            self.__totalTime += job.jobTime()
-        return self.__totalTime
     
     
     def sumIF(self, memory:MemoryBlock, job:JobInfo):
@@ -182,7 +178,6 @@ class BestFit:
             self.__sumIF.update({memory.memoryBlock() : [self.__sumBlock]}) # value is a list because we are storing the job and memory size difference in that block
             self.__totalHUP.update({memory.memoryBlock() : job.jobSize()})
             self.__totalUP.update({memory.memoryBlock() : self.__sumBlock})
-            self.__totalWQ.update({memory.memoryBlock() : job.jobTime()})
             
         else:
             temp = (memory.memorySize() - job.jobSize())
@@ -214,7 +209,7 @@ class BestFit:
 
         for key,value in self.__allocation.items():
             self.__totalWT += key.jobTime()
-            print(f'Job {str(key.jobStream())}:{str(key.jobSize())} has been allocated in memory block {str(value.memoryBlock())}:{str(value.memorySize())} and will reside for {str(key.jobTime())} ms')
+            print(f'Job {str(key.jobStream())} has been allocated in memory block {str(value.memoryBlock())} and will reside for {str(key.jobTime())} ms')
             self.sumIF(value,key)   # key = job and value = memory
             
         self.__jobCount += len(self.__allocation)
@@ -252,7 +247,7 @@ class BestFit:
 
             for key,value in self.__allocation.items():
                 self.__totalWT += key.jobTime()
-                print(f'Job {str(key.jobStream())}:{str(key.jobSize())} has been allocated in memory block {str(value.memoryBlock())}:{str(value.memorySize())} and will reside for {str(key.jobTime())} ms')
+                print(f'Job {str(key.jobStream())} has been allocated in memory block {str(value.memoryBlock())} and will reside for {str(key.jobTime())} ms')
                 self.sumIF(value,key)
 
         self.status()
@@ -261,8 +256,8 @@ class BestFit:
     def status(self):
         print(f'\n===================================== BEST FIT ===================================== ')
         print(f'AVERAGE THROUGHPUT (TOTAL ASSIGNED JOB COUNT/ TOTAL TIME: {str(round(self.__jobCount/self.__timer, 2))} jobs per unit of time')
-        print(f'AVERAGE WAITING QUEUE (TOTAL WQ LENGTH/ TOTAL TIME: {str(self.__jobCount/self.__timer)} jobs per unit of time')
-        print(f'AVERAGE WAITING TIME (TOTAL WT/ #JOBS: {str(round(self.totalTime()/self.__timer,2))} jobs per unit of time\n')
+        print(f'AVERAGE WAITING QUEUE (TOTAL WQ LENGTH/ TOTAL TIME: {str(round(self.__totalTime/self.__timer,2))} jobs per unit of time')
+        print(f'AVERAGE WAITING TIME (TOTAL WT/ #JOBS): {str(round((self.__totalWT)/self.__jobCount,2))} jobs per unit of time\n')
         print(f'TOTAL UNUSED PARTITION ((TOTAL USED MEMORY / 50000) * 100): {str(round(((sum(self.__totalUP.values()))/50000)*100, 2))}% out of 50,000 memory capacity')
         print(f'TOTAL HEAVILY USED PARTITION ((TOTAL EXHAUSTED MEMORY / 50000) * 100): {str(round(((sum(self.__totalHUP.values()))/50000)*100, 2))}% out of 50,000 memory capacity\n')
         print(f'----------------------------- INTERNAL FRAGMENTATION -----------------------------')
@@ -272,7 +267,6 @@ class BestFit:
             print(f'Block {str(memory.memoryBlock())}\'s total internal fragmentation (sum[block.size - job.size]): {str((sum(self.__sumIF[memory.memoryBlock()])))} units of memory')
             print(f'Block {str(memory.memoryBlock())}\'s average internal fragmentation (sum / totalTime): {str(round(sum(self.__sumIF[memory.memoryBlock()])/self.__timer, 2 ))} units of memory per unit of time\n')
 
-        print(self.__totalWT)
 
 
 # Worst Fit Memory Allocation
@@ -283,7 +277,7 @@ class WorstFit:
         self.__job = job
         self.__allocation = {}  # ({job : memory})
         self.__jobCount = 0     # For the total assigned jobs
-        self.__totalTime = len(self.__job)
+        self.__totalTime = 140  # constant given in the description of MP
         self.__timer = 1        # For the timer
         self.__sumBlock = 0
         self.__sumIF = {}       # Total Internal Fragmentation per block ({ memory : diffSize })
@@ -291,9 +285,9 @@ class WorstFit:
         self.__totalHUP = {}    # Total Heavily Used Partition ({ memoryBlock : jobSize })
         self.__totalUP = {}     # Total Unused Partition ({ memoryBlock : differenceSize})
         self.__totalWT = 0
-        self.__totalWQ = {}
-    
-    
+        self.__temp = job
+
+
     def sumIF(self, memory:MemoryBlock, job:JobInfo):
         self.__sumBlock = 0
         if memory.memoryBlock() not in self.__sumIF:
@@ -301,7 +295,7 @@ class WorstFit:
             self.__sumIF.update({memory.memoryBlock() : [self.__sumBlock]})
             self.__totalHUP.update({memory.memoryBlock() : job.jobSize()})
             self.__totalUP.update({memory.memoryBlock() : self.__sumBlock})
-            self.__totalWQ.update({memory.memoryBlock() : job.jobTime()})
+
             
         else:
             temp = (memory.memorySize() - job.jobSize())
@@ -332,13 +326,12 @@ class WorstFit:
                             worstBlock = 0
                     else:
                         worstBlock = diffSize
-
             
         for key,value in self.__allocation.items():
             self.__totalWT += key.jobTime()
-            print(f'Job {str(key.jobStream())}:{str(key.jobSize())} has been allocated in memory block {str(value.memoryBlock())}:{str(value.memorySize())} and will reside for {str(key.jobTime())} ms')
-            self.sumIF(value,key)        
-        
+            self.sumIF(value,key) 
+            print(f'Job {str(key.jobStream())} has been allocated in memory block {str(value.memoryBlock())} and will reside for {str(key.jobTime())} ms')
+                   
         while len(self.__allocation) >= 1:
             if len(self.__allocation) == 1 and list(self.__allocation.keys())[0].jobTime() - 1 == 0:
                 break  
@@ -373,7 +366,7 @@ class WorstFit:
             for key,value in self.__allocation.items():
                 self.sumIF(memory,job)
                 self.__totalWT += key.jobTime()
-                print(f'Job {str(key.jobStream())}:{str(key.jobSize())} has been allocated in memory block {str(value.memoryBlock())}:{str(value.memorySize())} and will reside for {str(key.jobTime())} ms')
+                print(f'Job {str(key.jobStream())} has been allocated in memory block {str(value.memoryBlock())} and will reside for {str(key.jobTime())} ms')
             
 
         self.status()
@@ -382,8 +375,8 @@ class WorstFit:
     def status(self):
         print(f'\n===================================== WORST FIT ===================================== ')
         print(f'AVERAGE THROUGHPUT (TOTAL ASSIGNED JOB COUNT/ TOTAL TIME: {str(round(self.__jobCount/self.__timer, 2))} jobs per unit of time')
-        print(f'AVERAGE WAITING QUEUE (TOTAL WQ LENGTH/ TOTAL TIME: {str(round(self.totalTime()/self.__timer,2))} jobs per unit of time')
-        print(f'AVERAGE WAITING TIME (TOTAL WT/ #JOBS): {str(round(self.totalTime()/len(self.__job),2))} jobs per unit of time')
+        print(f'AVERAGE WAITING QUEUE (TOTAL WQ LENGTH/ TOTAL TIME: {str(round(self.__totalTime/self.__timer,2))} jobs per unit of time')
+        print(f'AVERAGE WAITING TIME (TOTAL WT/ #JOBS): {str(round((self.__totalWT + self.__totalTime) /self.__jobCount,2))} jobs per unit of time')
         print(f'TOTAL UNUSED PARTITION ((TOTAL USED MEMORY / 50000) * 100): {str(round(((sum(self.__totalUP.values()))/50000)*100, 2))}% out of 50,000 memory capacity')
         print(f'TOTAL HEAVILY USED PARTITION ((TOTAL EXHAUSTED MEMORY / 50000) * 100): {str(round(((sum(self.__totalHUP.values()))/50000)*100, 2))}% out of 50,000 memory capacity\n')
         print(f'----------------------------- INTERNAL FRAGMENTATION -----------------------------')
@@ -395,12 +388,11 @@ class WorstFit:
                 print(f'Block {str(memory.memoryBlock())}\'s average internal fragmentation (sum / totalTime): {str(round(sum(self.__sumIF[memory.memoryBlock()])/self.__timer, 2 ))} units of memory per unit of time\n')
             except:
                 print(f'Block {str(memory.memoryBlock())} was not allocated')
-        print(self.__totalTime)
-        print(len(self.__job))
 
 
 
 def main():
+
     memoryBlockList = []
     jobList = []
     
@@ -420,19 +412,16 @@ def main():
             row = line.split()
             jobList.append(JobInfo(int(row[0]), int(row[1]), int(row[2])))
 
-    while True:
-        print(f'Choose Algorithm [1] Worst Fit\t [2] Best Fit\t [3] First Fit')
-        key = input("")
-        if key == '1':
-            wf = WorstFit(memoryBlockList, jobList).worstFit()
-        elif key == '2':
-            bf = BestFit(memoryBlockList, jobList).bestFit()
-        elif key == '3':
-            ff = FirstFit(memoryBlockList, jobList).firstFit()
-        else:
-            print("Invalid Key. Please try again.\n")
-    
-    
+
+    print(f'Choose Algorithm [1] Worst Fit\t [2] Best Fit\t [3] First Fit')
+    key = input("")
+    if key == '1':
+        wf = WorstFit(memoryBlockList, jobList).worstFit()
+    elif key == '2':
+        bf = BestFit(memoryBlockList, jobList).bestFit()
+    elif key == '3':
+        ff = FirstFit(memoryBlockList, jobList).firstFit()
+    else:
+        print("Invalid Key. Please try again.\n")
 
 main()
-
